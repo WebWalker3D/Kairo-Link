@@ -178,6 +178,7 @@ class RoverEngine(context: Context, code: String, private val listener: Listener
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
             main.post {
+            if (closed || gatt !== g) { g.close(); return@post }
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 g.requestMtu(100)
             } else {
@@ -194,30 +195,36 @@ class RoverEngine(context: Context, code: String, private val listener: Listener
             }
         }
 
-        override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) { main.post { g.discoverServices() } }
+        override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
+            main.post { if (!closed && gatt === g) g.discoverServices() }
+        }
 
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
             main.post {
+            if (closed || gatt !== g) return@post
             if (g.getService(RoverUuids.SERVICE) == null) { listener.onState("Not a Kairo rover"); g.disconnect() }
             else { listener.onState("Pairing…"); enqueue(Op.Read(RoverUuids.AUTH)) }
             }
         }
 
         override fun onCharacteristicRead(g: BluetoothGatt, ch: BluetoothGattCharacteristic, value: ByteArray, status: Int) {
-            main.post { onRead(g, ch.uuid, value, status); opDone() }
+            main.post { if (!closed && gatt === g) { onRead(g, ch.uuid, value, status); opDone() } }
         }
 
         override fun onCharacteristicWrite(g: BluetoothGatt, ch: BluetoothGattCharacteristic, status: Int) {
             main.post {
+                if (closed || gatt !== g) return@post
                 if (ch.uuid == RoverUuids.AUTH) enqueue(Op.Read(RoverUuids.AUTH))
                 opDone()
             }
         }
 
-        override fun onDescriptorWrite(g: BluetoothGatt, d: BluetoothGattDescriptor, status: Int) { main.post { opDone() } }
+        override fun onDescriptorWrite(g: BluetoothGatt, d: BluetoothGattDescriptor, status: Int) {
+            main.post { if (!closed && gatt === g) opDone() }
+        }
 
         override fun onCharacteristicChanged(g: BluetoothGatt, ch: BluetoothGattCharacteristic, value: ByteArray) {
-            if (ch.uuid == RoverUuids.STATUS) main.post { onStatus(value) }
+            if (ch.uuid == RoverUuids.STATUS) main.post { if (!closed && gatt === g) onStatus(value) }
         }
     }
 

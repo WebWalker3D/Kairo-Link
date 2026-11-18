@@ -23,11 +23,9 @@ import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import icu.kairo.link.core.PairingCode
-import icu.kairo.link.core.rover.MjpegReader
+import icu.kairo.link.core.rover.RoverLiveView
 import icu.kairo.link.core.rover.RoverStatus
 import icu.kairo.link.core.rover.StopReason
-import java.net.HttpURLConnection
-import java.net.URL
 import kotlin.math.roundToInt
 
 /**
@@ -42,9 +40,27 @@ class RoverActivity : Activity(), RoverEngine.Listener {
     private lateinit var codeBox: LinearLayout
     private lateinit var codeInput: EditText
     private lateinit var video: ImageView
+    private lateinit var cameraState: TextView
     private lateinit var speed: SeekBar
     @Volatile private var streamUrl: String? = null
-    private var streamThread: Thread? = null
+    private val liveView: RoverLiveView = RoverLiveView(onFrame = { jpeg, epoch ->
+        val bitmap = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)
+        runOnUiThread {
+            if (liveView.isCurrent(epoch)) {
+                if (bitmap != null) {
+                    video.setImageBitmap(bitmap)
+                    cameraState.text = "Live camera"
+                } else cameraState.text = "Camera sent an unreadable frame"
+            }
+        }
+    }, onState = { status, epoch ->
+        runOnUiThread {
+            if (liveView.isCurrent(epoch)) cameraState.text = when (status) {
+                RoverLiveView.State.CONNECTING -> "Connecting camera…"
+                RoverLiveView.State.RETRYING -> "Camera unavailable — retrying…"
+            }
+        }
+    }).also { it.pause() }
 
     private val bg = Color.rgb(12, 14, 20)
     private val fg = Color.rgb(226, 232, 240)
@@ -59,10 +75,12 @@ class RoverActivity : Activity(), RoverEngine.Listener {
 
     override fun onResume() {
         super.onResume()
+        liveView.resume()
         connectIfReady()
     }
 
     override fun onPause() {
+        liveView.pause()
         // Leaving the screen ends the session: STOP, then disconnect. No background link.
         engine?.pause()
         engine?.stop()
@@ -78,6 +96,7 @@ class RoverActivity : Activity(), RoverEngine.Listener {
     }
 
     override fun onDestroy() {
+        liveView.pause()
         engine?.stop()
         engine?.close()
         engine = null
@@ -127,31 +146,14 @@ class RoverActivity : Activity(), RoverEngine.Listener {
         if (url == streamUrl) return
         stopStream()
         streamUrl = url
-        if (url != null) startStream(url)
-    }
-
-    private fun startStream(url: String) {
-        streamThread = Thread {
-            runCatching {
-                val conn = URL(url).openConnection() as HttpURLConnection
-                conn.connectTimeout = 3_000; conn.readTimeout = 5_000
-                conn.inputStream.use { input ->
-                    val reader = MjpegReader(input)
-                    while (streamUrl == url && !Thread.currentThread().isInterrupted) {
-                        val jpeg = reader.next() ?: break
-                        val bmp = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size) ?: continue
-                        runOnUiThread { if (streamUrl == url) video.setImageBitmap(bmp) }
-                    }
-                }
-                conn.disconnect()
-            }
-        }.apply { isDaemon = true; start() }
+        if (url != null) liveView.start(url)
     }
 
     private fun stopStream() {
         streamUrl = null
-        streamThread?.interrupt()
-        streamThread = null
+        liveView.stop()
+        if (::video.isInitialized) video.setImageDrawable(null)
+        if (::cameraState.isInitialized) cameraState.text = "Waiting for camera connection"
     }
 
     private fun showState(s: String) { if (::state.isInitialized) state.text = s }
@@ -190,6 +192,7 @@ class RoverActivity : Activity(), RoverEngine.Listener {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(220)).apply { topMargin = dp(10) }
         }
         root.addView(video)
+        cameraState = text("Waiting for camera connection", 12f, dim).also(root::addView)
 
         val pad = FrameLayout(this).apply {
             background = GradientDrawable().apply { setColor(Color.rgb(28, 32, 44)); cornerRadius = dp(18).toFloat() }
