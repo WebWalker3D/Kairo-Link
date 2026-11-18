@@ -37,6 +37,9 @@ object RoverAuth {
         reply.size == 33 && reply[0].toInt() == 0 &&
             MessageDigest.isEqual(reply.copyOfRange(1, 33), hmac(secret, "kairo-rover/1 rover", nonceC, nonceR))
 
+    /** 0x02: too many recent failures; wait a minute. Not a verdict on this code. */
+    fun isLockedOut(reply: ByteArray): Boolean = reply.size == 1 && reply[0].toInt() == 2
+
     fun sessionKey(secret: ByteArray, nonceR: ByteArray, nonceC: ByteArray): ByteArray =
         hmac(secret, "kairo-rover/1 session", nonceR, nonceC)
 

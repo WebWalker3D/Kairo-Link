@@ -56,6 +56,7 @@ class RoverEngine(context: Context, code: String, private val listener: Listener
     private var sessionKey: ByteArray? = null
     private var lastStatus: RoverStatus? = null
     private var liveToken = ByteArray(0)
+    private var lockedUntil = 0L
 
     private sealed interface Op {
         data class Read(val uuid: UUID) : Op
@@ -79,6 +80,7 @@ class RoverEngine(context: Context, code: String, private val listener: Listener
 
     fun connect() {
         if (closed || gatt != null || scanning) return
+        if (android.os.SystemClock.elapsedRealtime() < lockedUntil) return // rover asked us to wait
         val adapter = app.getSystemService(BluetoothManager::class.java)?.adapter
         if (adapter == null || !adapter.isEnabled) return listener.onState("Bluetooth is off")
         val scanner = adapter.bluetoothLeScanner ?: return listener.onState("Bluetooth is off")
@@ -229,6 +231,14 @@ class RoverEngine(context: Context, code: String, private val listener: Listener
                     ?: return run { listener.onState("Not a Kairo rover"); g.disconnect() }
                 enqueue(Op.Write(RoverUuids.AUTH, hello, false))
             } else if (sessionKey == null) {
+                if (RoverAuth.isLockedOut(value)) {
+                    // Too many recent failures on the rover: not a verdict on this code. One retry in a minute.
+                    listener.onState("Too many pairing attempts — trying again in a minute")
+                    lockedUntil = android.os.SystemClock.elapsedRealtime() + 61_000
+                    g.disconnect()
+                    main.postDelayed({ if (!closed) connect() }, 62_000)
+                    return
+                }
                 if (!RoverAuth.verifyRoverProof(secret, value, nonceC, nonceR)) {
                     closed = true // no retry storm: wait for the code to be edited
                     listener.onRejected()

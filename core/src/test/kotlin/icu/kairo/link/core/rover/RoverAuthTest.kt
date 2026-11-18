@@ -48,6 +48,13 @@ class RoverAuthTest {
         assertFalse(RoverAuth.verifyRoverProof(secret, byteArrayOf(1), nonceC, nonceR))
     }
 
+    @Test fun lockout_reply_is_not_a_rejection() {
+        assertTrue(RoverAuth.isLockedOut(byteArrayOf(2)))
+        assertFalse(RoverAuth.isLockedOut(byteArrayOf(1)))
+        assertFalse(RoverAuth.isLockedOut(roverProof))
+        assertFalse(RoverAuth.verifyRoverProof(secret, byteArrayOf(2), nonceC, nonceR))
+    }
+
     @Test fun session_key_matches_vector() {
         assertArrayEquals(sessionKey, RoverAuth.sessionKey(secret, nonceR, nonceC))
     }
