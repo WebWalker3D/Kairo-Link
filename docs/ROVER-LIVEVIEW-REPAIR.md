@@ -30,9 +30,26 @@ blocked reads, same-URL stale callbacks and late URLs after pause.
 
 Qualification: 48 core tests passed, debug APK assembled, Android lint passed.
 Independent review found the late-URL and pre-start cancellation races; both
-received fixes and regression coverage. In-device preview/recovery verification
-is pending at this source commit. The first test run failed on the absent worker;
+received fixes and regression coverage, and follow-up review found no remaining
+important blockers. The first test run failed on the absent worker;
 the final app compile also required an explicit self-referential property type.
+
+## A16 installation and verification
+
+Source `9261172` is pushed on main. Updated the SM-S166V in place to version0.1.1,
+code2; the installed and built APK SHA256 both equal
+`08c89e8000d25c02602140b622f1c656e6972663854e1573d13e90952c270142`.
+The signing certificate matches the previous APK, which was saved outside the
+repository for rollback. Pairing and tether settings were retained.
+
+The old app's screenshot showed Connected, the rover address and a black panel.
+After the update, a screenshot shows the actual room image and Live camera.
+Leaving Rover closed its camera TCP connection (no remaining matching connection
+in the sampled socket list); returning reauthenticated and displayed actual live
+frames again. Private screenshots remain outside the repository. No driving input
+was sent; the status continued to report motors locked and deadman trips0.
+Connection-failure/EOF recovery is covered by the core regressions; no forced
+radio outage or access-point roaming recovery is claimed from this device check.
 
 ## Scope and rollback
 
