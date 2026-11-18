@@ -19,7 +19,8 @@
         android:allowBackup="false"
         android:icon="@drawable/ic_link"
         android:label="Kairo-Link"
-        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+        android:networkSecurityConfig="@xml/network_security_config">
 
         <activity
             android:name=".MainActivity"
@@ -30,6 +31,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".RoverActivity"
+            android:exported="false" />
 
         <service
             android:name=".LinkService"

@@ -138,6 +138,9 @@ class MainActivity : Activity() {
         }
         root.addView(batteryButton)
 
+        root.addView(label("Kairo's rover"))
+        root.addView(button("Drive the rover") { startActivity(Intent(this, RoverActivity::class.java)) })
+
         root.addView(label("Status"))
         status = text("", 14f, fg, mono = true)
         root.addView(status)

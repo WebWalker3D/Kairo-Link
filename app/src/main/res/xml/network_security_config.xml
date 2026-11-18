@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cleartext only for the rover's live view on the home LAN (http://<rover-ip>:81),
+     which is token-gated per BLE session. Link's own traffic is raw TLS through
+     its proxy and is unaffected. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -42,6 +42,10 @@ class Prefs(context: Context) {
     var interval: String
         get() = sp.getString("interval", null) ?: "dynamic"
         set(v) = sp.edit().putString("interval", v).apply()
+    /** The rover's own pairing code (separate from the Link code). */
+    var roverCode: String?
+        get() = sp.getString("rover_code", null)
+        set(v) = sp.edit().putString("rover_code", v).apply()
     /** True once the user started the link; it then comes back after reboots and updates. */
     var enabled: Boolean
         get() = sp.getBoolean("enabled", false)
